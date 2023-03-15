@@ -19,16 +19,28 @@ edges = cv2.addWeighted(sobelx, 0.5, sobely, 0.5, 0)
 edges = cv2.Canny(gray, 50, 200)
 edges = np.uint8(edges)
 
+lines = cv2.HoughLines(edges, 1, np.pi/180, 100)
+
+# Desenha as linhas detectadas na imagem original
+for line in lines:
+    rho,theta = line[0]
+    a = np.cos(theta)
+    b = np.sin(theta)
+    x0 = a*rho
+    y0 = b*rho
+    x1 = int(x0 + 1000*(-b))
+    y1 = int(y0 + 1000*(a))
+    x2 = int(x0 - 1000*(-b))
+    y2 = int(y0 - 1000*(a))
+    cv2.line(img, (x1, y1), (x2, y2), (0, 0, 255), 2)
+
 # Encontra os contornos dos agarras na imagem
 contours, hierarchy = cv2.findContours(edges, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
 # Desenha os contornos dos agarras na imagem original
-for i, contour in enumerate(contours):
+for contour in contours:
     (x, y, w, h) = cv2.boundingRect(contour)
     cv2.rectangle(img, (x, y), (x+w, y+h), (0, 255, 0), 2)
-
-    # Desenha um número dentro do retângulo
-    cv2.putText(img, str(i+1), (x+int(w/2), y+int(h/2)), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
 
 
 # Exibe a imagem final

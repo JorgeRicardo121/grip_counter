@@ -35,8 +35,10 @@ X_train = X_train / 255.
 X_test = X_test / 255.
 
 # Convertendo as coordenadas das agarras para one-hot encoding
-y_train = tf.one_hot(y_train.astype(int), depth=446*289)
-y_test = tf.one_hot(y_test.astype(int), depth=446*289)
+# Convertendo as coordenadas das agarras para one-hot encoding
+y_train = tf.one_hot(np.argmax(y_train, axis=-1), depth=4)
+y_test = tf.one_hot(np.argmax(y_test, axis=-1), depth=4)
+
 X_train = np.expand_dims(X_train, axis=-1)
 X_test = np.expand_dims(X_test, axis=-1)
 
@@ -53,7 +55,8 @@ model.add(MaxPooling2D((2, 2)))
 model.add(Flatten())
 model.add(Dense(256, activation='relu'))
 model.add(Dropout(0.5))
-model.add(Dense(446*289, activation='sigmoid'))
+model.add(Dense(4, activation='sigmoid'))
+
 
 # Compilando o modelo
 model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
@@ -72,7 +75,7 @@ print('Test accuracy:', score[1])
 # Carregando uma nova imagem
 nova_imagem = cv2.imread('./img/parede.jpg')
 nova_imagem = cv2.cvtColor(nova_imagem, cv2.COLOR_BGR2GRAY)
-nova_imagem = cv2.resize(nova_imagem, (224, 224))
+nova_imagem = cv2.resize(nova_imagem, (446, 289))
 
 # Fazendo a previsão da localização das agarras na nova imagem
 previsao = model.predict(nova_imagem.reshape(1, 289, 446, 1))

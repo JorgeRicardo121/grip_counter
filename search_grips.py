@@ -4,7 +4,7 @@ import pandas as pd
 img = cv2.imread('./img/parede.jpg')
 
 # Define o número de agarras que você deseja selecionar
-num_agarras = 10
+num_agarras = 4
 
 # Define uma lista para armazenar as coordenadas das agarras selecionadas
 coords = []
@@ -48,6 +48,14 @@ cv2.setMouseCallback('Selecione as agarras', mouse_callback)
 while len(coords) < num_agarras:
     cv2.imshow('Selecione as agarras', img)
     cv2.waitKey(1)
+    
+for i, contour in enumerate(contours):
+    # Extrai a região correspondente ao contorno atual
+    x, y, w, h = cv2.boundingRect(contour)
+    roi = img[y:y+h, x:x+w]
+    
+    # Salva a região como um novo arquivo PNG
+    cv2.imwrite(f"agarras/agarra_{i}.png", roi)
 
 # Exibe a imagem com os retângulos em volta das agarras selecionadas
 for i, (x1, y1, x2, y2) in enumerate(coords):
@@ -64,6 +72,8 @@ df = pd.DataFrame(coords, columns=['x', 'y', 'w', 'h'])
 # # Salva o DataFrame em um arquivo CSV
 df.to_csv('coordenadas_agarras.csv', index=False)
 
+# Salva a imagem com as agarras contornadas em um arquivo PNG
+cv2.imwrite('agarras_contornadas.png', img)
 
 # import cv2
 # import pandas as pd
@@ -104,3 +114,37 @@ df.to_csv('coordenadas_agarras.csv', index=False)
 
 # # Salva o DataFrame em um arquivo CSV
 # df.to_csv('coordenadas_agarras.csv', index=False)
+
+# import cv2
+# import sqlite3
+
+# # Conectar ao banco de dados
+# conn = sqlite3.connect('agarras.db')
+# cursor = conn.cursor()
+
+# # Criar tabela para as agarras
+# cursor.execute('''CREATE TABLE IF NOT EXISTS agarras
+#                 (id INTEGER PRIMARY KEY,
+#                  x_min INTEGER,
+#                  y_min INTEGER,
+#                  x_max INTEGER,
+#                  y_max INTEGER)''')
+
+
+# Modifique a linha de código que desenha um retângulo ao redor da agarras para que ela salve as coordenadas da agarras na tabela do banco de dados.
+
+
+
+# for box in boxes:
+#     x_min, y_min, x_max, y_max = box
+#     cv2.rectangle(image, (x_min, y_min), (x_max, y_max), (0, 255, 0), 2)
+
+#     # Salvar as coordenadas no banco de dados
+#     cursor.execute('INSERT INTO agarras (x_min, y_min, x_max, y_max) VALUES (?, ?, ?, ?)',
+#                    (x_min, y_min, x_max, y_max))
+
+# # Salvar as alterações no banco de dados
+# conn.commit()
+
+# # Fechar a conexão com o banco de dados
+# conn.close()

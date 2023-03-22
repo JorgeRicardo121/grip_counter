@@ -1,104 +1,88 @@
 import cv2
-from cv2 import THRESH_MASK
-import numpy as np
-
-# Define as variáveis globais que armazenam as coordenadas do retângulo
-drawing = False
-ix, iy = -1, -1
-
-# Define a função de callback que será chamada quando ocorrer um evento do mouse
-def draw_rectangle(event, x, y, flags, params):
-    global ix, iy, drawing, img
-
-    if event == cv2.EVENT_LBUTTONDOWN:
-        drawing = True
-        ix, iy = x, y
-
-    elif event == cv2.EVENT_MOUSEMOVE:
-        if drawing:
-            # Desenha um retângulo dinâmico enquanto o mouse é arrastado
-            cv2.rectangle(img, (ix, iy), (x, y), (0, 255, 0), 2)
-
-    elif event == cv2.EVENT_LBUTTONUP:
-        drawing = False
-
-        # Desenha o retângulo final na imagem
-        cv2.rectangle(img, (ix, iy), (x, y), (0, 255, 0), 2)
-
-        # Armazena as coordenadas do retângulo
-        global x_rect, y_rect, w_rect, h_rect
-        x_rect, y_rect, w_rect, h_rect = ix, iy, x - ix, y - iy
+import pandas as pd
 
 # Carrega a imagem da parede de escalada
-img = cv2.imread(".\img\parede.jpg")
+img = cv2.imread('./img/parede.jpg')
 
-# Cria uma janela para exibir a imagem
-cv2.namedWindow('Imagem original')
+# Converte a imagem para escala de cinza
+gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
-# Define a função de callback para a janela
-cv2.setMouseCallback('Imagem original', draw_rectangle)
+# Aplica uma limiarização na imagem para obter a máscara das agarras
+_, mask = cv2.threshold(gray, 200, 255, cv2.THRESH_BINARY_INV)
 
-# Exibe a imagem na janela e aguarda a interação do usuário
-while True:
-    cv2.imshow('Imagem original', img)
-    key = cv2.waitKey(1) & 0xFF
+# Encontra os contornos na imagem
+contours, hierarchy = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
-    # Fecha a janela se o usuário pressionar a tecla 'q'
-    if key == ord('q'):
-        break
+# Define o número de agarras que você deseja selecionar
+num_agarras = 2
 
-# Segmenta a imagem usando as coordenadas do retângulo
-roi = img[y_rect:y_rect+h_rect, x_rect:x_rect+w_rect]
+# Define uma lista para armazenar as coordenadas das agarras selecionadas
+coords = []
 
-# Segmenta a imagem usando as coordenadas do retângulo
-roi = img[y_rect:y_rect+h_rect, x_rect:x_rect+w_rect]
+# Define a variável para armazenar as coordenadas do ponto inicial do retângulo
+rect_start = None
 
-# Define a máscara com os pixels dentro da agarra como brancos e os pixels fora como pretos
-mask = np.zeros_like(roi)
-mask[THRESH_MASK > 0] = 255
+# Define a função de callback do mouse para capturar cliques na imagem
+def mouse_callback(event, x, y, flags, param):
+    # Usa a variável global rect_start para armazenar as coordenadas do ponto inicial do retângulo
+    global rect_start
+    # Se o botão esquerdo do mouse for pressionado, armazena as coordenadas do ponto inicial do retângulo
+    if event == cv2.EVENT_LBUTTONDOWN:
+        rect_start = (x, y)
 
-# Aplica a máscara na imagem original
-result = cv2.bitwise_and(img, img, mask=mask)
+    elif event == cv2.EVENT_MOUSEMOVE:
+        if rect_start is not None:
+            # Desenha um retângulo em tempo real com o mouse enquanto o usuário está selecionando a agarra
+            img_copy = img.copy()
+            cv2.rectangle(img_copy, rect_start, (x, y), (0, 0, 255), 2)
+            cv2.imshow('Selecione as agarras', img_copy)
 
-# Converte a região de interesse para escala de cinza
-gray = cv2.cvtColor(result, cv2.COLOR_BGR2GRAY)
 
-# Aplica um filtro Gaussiano para reduzir o ruído
-gray = cv2.GaussianBlur(gray, (5, 5), 0)
+    # Se o botão esquerdo do mouse for solto, calcula as coordenadas do retângulo e adiciona à lista de agarras
+    elif event == cv2.EVENT_LBUTTONUP:
+        rect_end = (x, y)
+        # Calcula as coordenadas do retângulo a partir dos pontos inicial e final selecionados pelo usuário
+        x1, y1 = min(rect_start[0], rect_end[0]), min(rect_start[1], rect_end[1])
+        x2, y2 = max(rect_start[0], rect_end[0]), max(rect_start[1], rect_end[1])
+        coords.append((x1, y1, x2, y2))
+        # Desenha um retângulo em volta da última agarra selecionada
+        cv2.rectangle(img, (x1, y1), (x2, y2), (0, 0, 255), 2)
+        # Atualiza a janela de exibição da imagem
+        cv2.imshow('Selecione as agarras', img)
 
-# Binariza a imagem com um limiar adaptativo
-thresh = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 11, 2)
+# Cria a janela de exibição da imagem e define a função de callback do mouse
+cv2.namedWindow('Selecione as agarras')
+cv2.setMouseCallback('Selecione as agarras', mouse_callback)
 
-# Encontra os contornos na imagem binarizada
-contours, hierarchy = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
-# Desenha os contornos na imagem original
-cv2.drawContours(img, contours, -1, (0, 0, 255), 2)
 
-# Exibe a imagem com os contornos na janela
-cv2.imshow('Imagem com contornos', img)
+# Loop principal para selecionar as agarras
+while len(coords) < num_agarras:
+    cv2.imshow('Selecione as agarras', img)
+    cv2.waitKey(1)
+    
+for i, contour in enumerate(contours):
+    # Extrai a região correspondente ao contorno atual
+    x, y, w, h = cv2.boundingRect(contour)
+    roi = img[y:y+h, x:x+w]
+    
+    # Salva a região como um novo arquivo PNG
+    cv2.imwrite(f"agarras/agarra_{i}.png", roi)
+
+# Exibe a imagem com os retângulos em volta das agarras selecionadas
+for i, (x1, y1, x2, y2) in enumerate(coords):
+    cv2.rectangle(img, (x1, y1), (x2, y2), (0, 0, 255), 2)
+    cv2.putText(img, f'Agarra {i+1}', (x2+10, y2), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1)
+
+cv2.imshow('Agarras selecionadas', img)
 cv2.waitKey(0)
+cv2.destroyAllWindows()
 
-# # Converte a região de interesse para escala de cinza
-# gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
+# # Cria um DataFrame com as coordenadas das agarras
+df = pd.DataFrame(coords, columns=['x', 'y', 'w', 'h'])
 
-# # Aplica um filtro Gaussiano para reduzir o ruído
-# gray = cv2.GaussianBlur(gray, (5, 5), 0)
+# # Salva o DataFrame em um arquivo CSV
+df.to_csv('coordenadas_agarras.csv', index=False)
 
-# # Binariza a imagem com um limiar adaptativo
-# thresh = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 11, 2)
-
-# # Encontra os contornos na imagem binarizada
-# contours, hierarchy = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-
-# # Desenha os contornos na imagem original
-# for contour in contours:
-#     for point in contour:
-#         point[0][0] += x_rect
-#         point[0][1] += y_rect
-# cv2.drawContours(img, contours, -1, (0, 0, 255), 2)
-
-# # Exibe a imagem com os contornos na janela
-# cv2.imshow('Imagem com contornos', img)
-# cv2.waitKey(0)
-
+# Salva a imagem com as agarras contornadas em um arquivo PNG
+cv2.imwrite('agarras_contornadas.png', img)
